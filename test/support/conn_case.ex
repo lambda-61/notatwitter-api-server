@@ -19,6 +19,10 @@ defmodule NotatwitterWeb.ConnCase do
     quote do
       # Import conveniences for testing with connections
       use Phoenix.ConnTest
+
+      import Notatwitter.Factory
+      import NotatwitterWeb.ConnCase
+
       alias NotatwitterWeb.Router.Helpers, as: Routes
 
       # The default endpoint for testing
@@ -34,5 +38,10 @@ defmodule NotatwitterWeb.ConnCase do
     end
 
     {:ok, conn: Phoenix.ConnTest.build_conn()}
+  end
+
+  def as_user(conn, user) do
+    {:ok, token, _} = Guardian.encode_and_sign(Notatwitter.Auth.Guardian, user)
+    Plug.Conn.put_req_header(conn, "authorization", "Bearer #{token}")
   end
 end

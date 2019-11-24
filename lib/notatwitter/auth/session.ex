@@ -11,7 +11,6 @@ defmodule Notatwitter.Auth.Session do
       {:ok, user, token}
     else
       error ->
-        IO.inspect(error)
         {:error, :invalid_credentials}
     end
   end

@@ -20,20 +20,29 @@ defmodule NotatwitterWeb.Router do
     plug Guardian.Plug.EnsureAuthenticated
   end
 
-  scope "/", NotatwitterWeb do
-    pipe_through :browser
+  scope "/users", NotatwitterWeb do
+    pipe_through [:api, :ensure_auth]
 
-    get "/", PageController, :index
+    resources "/", UserController, only: [:index, :show, :create, :update] do
+      resources "/posts", PostController, only: [:index, :create, :update] do
+        resources "/replies", ReplyController, only: [:index, :create, :update]
+      end
+
+      get "/follows", FollowingController, :follows
+      get "/followers", FollowingController, :followers
+      post "/follow", FollowingController, :follow
+      delete "/unfollow", FollowingController, :unfollow
+    end
   end
 
   scope "/auth", NotatwitterWeb.Auth do
     pipe_through :api
 
     post "/login", SessionController, :login
-    get "/session", SessionController, :session
+    post "/register", RegistrationController, :register
 
     pipe_through :ensure_auth
 
-    get "/asdf", SessionController, :asdf
+    get "/session", SessionController, :session
   end
 end

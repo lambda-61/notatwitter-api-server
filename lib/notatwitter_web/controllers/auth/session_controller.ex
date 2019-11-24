@@ -17,8 +17,4 @@ defmodule NotatwitterWeb.Auth.SessionController do
     user = Guardian.Plug.current_resource(conn)
     render(conn, "show.json", user: user)
   end
-
-  def asdf(conn, _) do
-    json(conn, %{kek: :lol})
-  end
 end

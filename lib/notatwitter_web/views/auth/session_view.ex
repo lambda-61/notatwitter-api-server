@@ -3,15 +3,16 @@ defmodule NotatwitterWeb.Auth.SessionView do
 
   use NotatwitterWeb, :view
 
-  def render("show.json", %{user: %{username: name}, token: token}) do
+  def render("show.json", %{user: %{id: id, username: name}, token: token}) do
     %{
+      id: id,
       username: name,
       token: token
     }
   end
 
-  def render("show.json", %{user: %{username: username}}) do
-    %{username: username}
+  def render("show.json", %{user: %{id: id, username: username}}) do
+    %{id: id, username: username}
   end
 
   def render("show.json", _) do

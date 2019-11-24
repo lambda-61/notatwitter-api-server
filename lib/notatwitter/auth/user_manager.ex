@@ -1,6 +1,7 @@
 defmodule Notatwitter.Auth.UserManager do
   @moduledoc false
 
+  alias Ecto.Changeset
   alias Notatwitter.Auth.User
   alias Notatwitter.Repo
 
@@ -14,7 +15,21 @@ defmodule Notatwitter.Auth.UserManager do
 
   def create(attrs) do
     %User{}
-    |> User.changeset(attrs)
+    |> Changeset.cast(attrs, [:username, :password])
+    |> Changeset.validate_required([:username, :password])
+    |> Changeset.unique_constraint(:username, message: "taken")
+    |> put_password_hash
     |> Repo.insert()
+  end
+
+  defp put_password_hash(%Changeset{} = changeset) do
+    case Changeset.get_field(changeset, :password) do
+      nil ->
+        changeset
+
+      password ->
+        hash = Argon2.hash_pwd_salt(password)
+        Changeset.change(changeset, password_hash: hash)
+    end
   end
 end

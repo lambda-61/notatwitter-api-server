@@ -13,7 +13,8 @@ config :notatwitter,
 # Configures the endpoint
 config :notatwitter, NotatwitterWeb.Endpoint,
   url: [host: "localhost"],
-  secret_key_base: "zV+6GICF7VWsBFYhpv4SXogjdngh0Mo9sQLnS8LB0Iu3hbxBMaUShoML/O/cxCOJ",
+  secret_key_base:
+    "zV+6GICF7VWsBFYhpv4SXogjdngh0Mo9sQLnS8LB0Iu3hbxBMaUShoML/O/cxCOJ",
   render_errors: [view: NotatwitterWeb.ErrorView, accepts: ~w(html json)],
   pubsub: [name: Notatwitter.PubSub, adapter: Phoenix.PubSub.PG2]
 
@@ -28,6 +29,10 @@ config :phoenix, :json_library, Jason
 config :notatwitter, Notatwitter.Auth.Guardian,
   issuer: "notatwitter",
   secret_key: "wL9B6IPX5iljqxFMnc4kxkL8DTW5QAHLiTvLldaYzZqX43ZEG5vFgimHwCX1SjOT"
+
+config :arc,
+  storage: Arc.Storage.Local,
+  storage_dir: "uploads"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

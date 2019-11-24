@@ -16,12 +16,11 @@ defmodule Notatwitter.DataCase do
 
   using do
     quote do
-      alias Notatwitter.Repo
-
       import Ecto
-      import Ecto.Changeset
-      import Ecto.Query
-      import Notatwitter.DataCase
+      import Ecto.{Changeset, Query}
+      import Notatwitter.{DataCase, Factory}
+
+      alias Notatwitter.Repo
     end
   end
 

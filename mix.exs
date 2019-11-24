@@ -25,7 +25,7 @@ defmodule Notatwitter.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(env) when env in [:dev, :test], do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Specifies your project dependencies.
@@ -33,8 +33,14 @@ defmodule Notatwitter.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {
+        :arc_ecto,
+        git: "https://github.com/Elonsoft/arc_ecto.git",
+        commit: "3a5383850ba6e2a5e996eaaa8ab8fc8b79ea2c6e"
+      },
       {:argon2_elixir, "~> 2.0"},
       {:ecto_sql, "~> 3.1"},
+      {:ex_machina, "~> 2.2.1"},
       {:gettext, "~> 0.11"},
       {:guardian, "~> 2.0"},
       {:jason, "~> 1.0"},
