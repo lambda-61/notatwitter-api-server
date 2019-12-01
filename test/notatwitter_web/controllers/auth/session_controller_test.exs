@@ -29,6 +29,16 @@ defmodule NotatwitterWeb.Auth.SessionControllerTest do
       conn = post(conn, Routes.session_path(conn, :login), attrs)
       assert _ = json_response(conn, 401)
     end
+
+    test "puts cookies after successful login", %{orig_conn: conn} do
+      attrs = %{username: "asdf", password: "asdfasdf"}
+
+      %{resp_headers: headers} =
+        post(conn, Routes.session_path(conn, :login), attrs)
+
+      assert {"set-cookie", "sessionToken" <> _} =
+               Enum.find(headers, &(elem(&1, 0) == "set-cookie"))
+    end
   end
 
   describe "#session" do

@@ -6,6 +6,9 @@ defmodule Notatwitter.Auth.Guardian.Pipeline do
     error_handler: Notatwitter.Auth.Guardian.ErrorHandler,
     module: Notatwitter.Auth.Guardian
 
+  # Extract token from cookies.
+  plug CookieToJwtPlug
+
   # If there is a session token, restrict it to an access token and validate it
   plug Guardian.Plug.VerifySession, claims: %{"typ" => "access"}
 

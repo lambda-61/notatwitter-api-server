@@ -40,6 +40,11 @@ defmodule Notatwitter.MixProject do
       },
       {:argon2_elixir, "~> 2.0"},
       {:bodyguard, "~> 2.4"},
+      {
+        :cookie_to_jwt_plug,
+        git: "https://github.com/Elonsoft/cookie_to_jwt_plug.git",
+        commit: "b93c68f44fc26a119df7de6e3557a91540330ca4"
+      },
       {:ecto_sql, "~> 3.1"},
       {:ex_machina, "~> 2.2.1"},
       {:gettext, "~> 0.11"},

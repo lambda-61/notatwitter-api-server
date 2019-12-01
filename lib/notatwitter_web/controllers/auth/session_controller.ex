@@ -9,7 +9,9 @@ defmodule NotatwitterWeb.Auth.SessionController do
 
   def login(conn, %{"username" => username, "password" => password}) do
     with {:ok, user, token} <- Auth.Session.authenticate(username, password) do
-      render(conn, "show.json", user: user, token: token)
+      conn
+      |> CookieToJwtPlug.put_session_token(token)
+      |> render("show.json", user: user, token: token)
     end
   end
 
