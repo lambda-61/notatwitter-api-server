@@ -32,10 +32,10 @@ defmodule NotatwitterWeb.ReplyControllerTest do
 
       assert %{
                "id" => _,
-               "user_id" => ^user_id,
+               "userId" => ^user_id,
                "username" => ^username,
                "avatar" => "http://localhost:4000/uploads" <> _,
-               "created_at" => _,
+               "createdAt" => _,
                "text" => "lol"
              } = reply
     end

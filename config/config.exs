@@ -26,6 +26,8 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :phoenix, :format_encoders, json: Notatwitter.CamelCaseJSONEncoder
+
 config :notatwitter, Notatwitter.Auth.Guardian,
   issuer: "notatwitter",
   secret_key: "wL9B6IPX5iljqxFMnc4kxkL8DTW5QAHLiTvLldaYzZqX43ZEG5vFgimHwCX1SjOT"

@@ -26,10 +26,10 @@ defmodule NotatwitterWeb.PostControllerTest do
 
       assert %{
                "id" => ^post_id,
-               "user_id" => ^user_id,
+               "userId" => ^user_id,
                "username" => ^username,
                "avatar" => "http://localhost:4000/uploads/" <> _,
-               "created_at" => _,
+               "createdAt" => _,
                "text" => "kek"
              } = post
     end
