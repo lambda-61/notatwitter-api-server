@@ -7,7 +7,8 @@ defmodule NotatwitterWeb.PostControllerTest do
 
   setup %{conn: conn} do
     user = insert(:user, username: "asdf")
-    {:ok, _} = Users.update_user(user.id, %{avatar: base64_avatar()})
+    {:ok, profile} = Users.find_user(user.id)
+    {:ok, _} = Users.update_user(profile, %{avatar: base64_avatar()})
     post = insert(:post, user_id: user.id, text: "kek")
     [conn: as_user(conn, user), user: user, post: post]
   end

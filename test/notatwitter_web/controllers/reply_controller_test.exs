@@ -7,7 +7,8 @@ defmodule NotatwitterWeb.ReplyControllerTest do
 
   setup %{conn: conn} do
     user = insert(:user, username: "user")
-    {:ok, _} = Users.update_user(user.id, %{avatar: base64_avatar()})
+    {:ok, profile} = Users.find_user(user.id)
+    {:ok, _} = Users.update_user(profile, %{avatar: base64_avatar()})
     post = insert(:post, user_id: user.id, text: "kek")
     reply = insert(:reply, post_id: post.id, user_id: user.id, text: "lol")
     [conn: as_user(conn, user), user: user, post: post, reply: reply]

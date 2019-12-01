@@ -36,9 +36,8 @@ defmodule Notatwitter.User.Post.Reply.Manager do
     |> Repo.insert()
   end
 
-  def update(reply_id, attrs) do
-    with {:ok, reply} <- find(reply_id),
-         {:ok, reply} <- do_update(reply, attrs) do
+  def update(%Reply{} = reply, attrs) do
+    with {:ok, reply} <- do_update(reply, attrs) do
       {:ok, Repo.preload(reply, [:user])}
     end
   end

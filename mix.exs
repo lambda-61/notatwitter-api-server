@@ -39,6 +39,7 @@ defmodule Notatwitter.MixProject do
         commit: "3a5383850ba6e2a5e996eaaa8ab8fc8b79ea2c6e"
       },
       {:argon2_elixir, "~> 2.0"},
+      {:bodyguard, "~> 2.4"},
       {:ecto_sql, "~> 3.1"},
       {:ex_machina, "~> 2.2.1"},
       {:gettext, "~> 0.11"},

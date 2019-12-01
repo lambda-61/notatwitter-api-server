@@ -10,7 +10,7 @@ defmodule Notatwitter.Auth.Session do
          {:ok, token, _} <- Guardian.encode_and_sign(Auth.Guardian, user) do
       {:ok, user, token}
     else
-      error ->
+      _ ->
         {:error, :invalid_credentials}
     end
   end

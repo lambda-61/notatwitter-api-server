@@ -3,8 +3,8 @@ defmodule NotatwitterWeb.ErrorView do
 
   use NotatwitterWeb, :view
 
-  def render("401.json", %{error: error}) do
-    %{error: error}
+  def render("401.json", %{}) do
+    %{errors: ["Unauthorized"]}
   end
 
   def render("404.json", %{}) do

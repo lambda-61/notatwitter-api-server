@@ -3,6 +3,7 @@ defmodule NotatwitterWeb.ReplyController do
 
   use NotatwitterWeb, :controller
 
+  alias Notatwitter.User.AccessPolicy
   alias Notatwitter.Users
 
   action_fallback NotatwitterWeb.ErrorController
@@ -12,8 +13,9 @@ defmodule NotatwitterWeb.ReplyController do
     render(conn, "index.json", replies: replies)
   end
 
-  def create(conn, %{"user_id" => user_id, "post_id" => post_id} = params) do
-    # TODO!: Put user_id from the conn.
+  def create(conn, %{"post_id" => post_id} = params) do
+    %{id: user_id} = Guardian.Plug.current_resource(conn)
+
     with {:ok, reply} <- Users.create_reply(user_id, post_id, params) do
       conn
       |> put_status(:created)
@@ -22,7 +24,12 @@ defmodule NotatwitterWeb.ReplyController do
   end
 
   def update(conn, %{"id" => id} = params) do
-    with {:ok, reply} <- Users.update_reply(id, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, reply} <- Users.find_reply(id),
+         :ok <-
+           Bodyguard.permit(AccessPolicy, :update_reply, current_user, reply),
+         {:ok, reply} <- Users.update_reply(reply, params) do
       render(conn, "updated.json", reply: reply)
     end
   end

@@ -3,6 +3,7 @@ defmodule NotatwitterWeb.UserController do
 
   use NotatwitterWeb, :controller
 
+  alias Notatwitter.User.AccessPolicy
   alias Notatwitter.Users
 
   action_fallback NotatwitterWeb.ErrorController
@@ -27,7 +28,12 @@ defmodule NotatwitterWeb.UserController do
   end
 
   def update(conn, %{"id" => id} = params) do
-    with {:ok, user} <- Users.update_user(id, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, user} <- Users.find_user(id),
+         :ok <-
+           Bodyguard.permit(AccessPolicy, :update_user, current_user, user),
+         {:ok, user} <- Users.update_user(user, params) do
       render(conn, "updated.json", user: user)
     end
   end

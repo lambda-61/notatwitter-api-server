@@ -1,7 +1,7 @@
 defmodule Notatwitter.User.Post.Manager do
   @moduledoc false
 
-  import Ecto.Query
+  import Ecto.Query, only: [where: 3, preload: 2]
 
   alias Ecto.Changeset
   alias Notatwitter.Repo
@@ -35,9 +35,8 @@ defmodule Notatwitter.User.Post.Manager do
     |> Repo.insert()
   end
 
-  def update(post_id, attrs) do
-    with {:ok, post} <- find(post_id),
-         {:ok, post} <- do_update(post, attrs) do
+  def update(%Post{} = post, attrs) do
+    with {:ok, post} <- do_update(post, attrs) do
       {:ok, Repo.preload(post, [:user])}
     end
   end
