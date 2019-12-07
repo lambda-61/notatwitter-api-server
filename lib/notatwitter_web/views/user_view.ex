@@ -23,7 +23,7 @@ defmodule NotatwitterWeb.UserView do
     %{
       id: user.id,
       username: user.username,
-      avatar: image_url({user.avatar, user}, :original)
+      avatar: image_url({user.avatar, user}, :big)
     }
   end
 end

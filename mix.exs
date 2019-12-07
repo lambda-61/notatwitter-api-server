@@ -58,7 +58,7 @@ defmodule Notatwitter.MixProject do
       {:phoenix_swagger, github: "xerions/phoenix_swagger", branch: "master"},
       {:plug_cowboy, "~> 2.0"},
       {:postgrex, ">= 0.0.0"},
-      {:proper_case, "~> 1.0.2"}
+      {:proper_case, github: "johnnyji/proper_case", branch: "master"}
     ]
   end
 

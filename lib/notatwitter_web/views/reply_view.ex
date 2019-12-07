@@ -22,7 +22,7 @@ defmodule NotatwitterWeb.ReplyView do
       id: reply.id,
       user_id: user.id,
       username: user.username,
-      avatar: image_url({user.avatar, user}, :original),
+      avatar: image_url({user.avatar, user}, :big),
       created_at: datetime_to_integer(reply.inserted_at),
       text: reply.text
     }

@@ -47,7 +47,7 @@ defmodule NotatwitterWeb.UserControllerTest do
       {:ok, profile} = Users.find_user(user_id)
 
       old_document =
-        Notatwitter.User.Avatar.url({profile.avatar, profile}, :original)
+        Notatwitter.User.Avatar.url({profile.avatar, profile}, :big)
 
       attrs = %{
         avatar:
