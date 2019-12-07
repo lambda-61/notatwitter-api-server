@@ -36,29 +36,17 @@ defmodule NotatwitterWeb.PostControllerTest do
   end
 
   describe "#create" do
-    test "creates a post for user", context do
-      %{conn: conn, user: %{id: user_id}} = context
+    test "creates a post for user", %{conn: conn} do
       attrs = %{text: "lol"}
-      conn = post(conn, Routes.user_post_path(conn, :create, user_id), attrs)
+      conn = post(conn, Routes.post_path(conn, :create), attrs)
       assert %{"text" => "lol"} = json_response(conn, 201)
-    end
-
-    test "cannot create a post for not a current user", %{conn: conn} do
-      user = insert(:user)
-      attrs = %{text: "lol"}
-      conn = post(conn, Routes.user_post_path(conn, :create, user.id), attrs)
-      assert _ = json_response(conn, 401)
     end
   end
 
   describe "#update" do
-    test "updates a post for a user", context do
-      %{conn: conn, user: %{id: user_id}, post: %{id: id}} = context
+    test "updates a post for a user", %{conn: conn, post: %{id: id}} do
       attrs = %{text: "lol"}
-
-      conn =
-        patch(conn, Routes.user_post_path(conn, :update, user_id, id), attrs)
-
+      conn = patch(conn, Routes.post_path(conn, :update, id), attrs)
       assert %{"text" => "lol"} = json_response(conn, 200)
     end
 
@@ -67,14 +55,8 @@ defmodule NotatwitterWeb.PostControllerTest do
       %{conn: conn} = context
       user = insert(:user)
       post = insert(:post, user_id: user.id)
-
-      conn =
-        patch(
-          conn,
-          Routes.user_post_path(conn, :update, user.id, post.id),
-          %{text: "lol"}
-        )
-
+      attrs = %{text: "lol"}
+      conn = patch(conn, Routes.post_path(conn, :update, post.id), attrs)
       assert _ = json_response(conn, 401)
     end
   end

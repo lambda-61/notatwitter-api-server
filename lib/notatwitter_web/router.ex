@@ -21,19 +21,22 @@ defmodule NotatwitterWeb.Router do
     plug Guardian.Plug.EnsureAuthenticated
   end
 
-  scope "/users", NotatwitterWeb do
+  scope "/", NotatwitterWeb do
     pipe_through [:api, :ensure_auth]
 
-    resources "/", UserController, only: [:index, :show, :create, :update] do
-      resources "/posts", PostController, only: [:index, :create, :update] do
-        resources "/replies", ReplyController, only: [:index, :create, :update]
-      end
-
+    resources "/users", UserController, only: [:index, :show, :create, :update] do
+      get "/posts", PostController, :index
       get "/follows", FollowingController, :follows
       get "/followers", FollowingController, :followers
       post "/follow", FollowingController, :follow
       delete "/unfollow", FollowingController, :unfollow
     end
+
+    resources "/posts", PostController, only: [:create, :update] do
+      resources "/replies", ReplyController, only: [:index, :create]
+    end
+
+    resources "/replies", ReplyController, only: [:update]
   end
 
   scope "/auth", NotatwitterWeb.Auth do
@@ -45,5 +48,22 @@ defmodule NotatwitterWeb.Router do
     pipe_through :ensure_auth
 
     get "/session", SessionController, :session
+  end
+
+  if Mix.env() == :dev do
+    scope "/dev" do
+      forward "/swagger", PhoenixSwagger.Plug.SwaggerUI,
+        otp_app: :notatwitter,
+        swagger_file: "swagger.json"
+    end
+  end
+
+  def swagger_info do
+    %{
+      info: %{
+        version: "1.0",
+        title: "EcomWidgetApp"
+      }
+    }
   end
 end

@@ -55,6 +55,7 @@ defmodule Notatwitter.MixProject do
       {:phoenix_html, "~> 2.11"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_pubsub, "~> 1.1"},
+      {:phoenix_swagger, github: "xerions/phoenix_swagger", branch: "master"},
       {:plug_cowboy, "~> 2.0"},
       {:postgrex, ">= 0.0.0"},
       {:proper_case, "~> 1.0.2"}
@@ -71,7 +72,8 @@ defmodule Notatwitter.MixProject do
     [
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate", "test"]
+      test: ["ecto.create --quiet", "ecto.migrate", "test"],
+      swagger: ["phx.swagger.generate"]
     ]
   end
 end
