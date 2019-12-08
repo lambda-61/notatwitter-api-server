@@ -22,6 +22,16 @@ config :notatwitter, NotatwitterWeb.Endpoint,
   ],
   pubsub: [name: Notatwitter.PubSub, adapter: Phoenix.PubSub.PG2]
 
+config :notatwitter, :phoenix_swagger,
+  swagger_files: %{
+    "priv/static/swagger.json" => [
+      router: NotatwitterWeb.Router,
+      endpoint: NotatwitterWeb.Endpoint
+    ]
+  }
+
+config :phoenix_swagger, json_library: Jason
+
 # Configures Elixir's Logger
 config :logger, :console,
   format: "$time $metadata[$level] $message\n",

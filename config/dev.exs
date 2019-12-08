@@ -22,16 +22,6 @@ config :notatwitter, NotatwitterWeb.Endpoint,
   check_origin: false,
   watchers: []
 
-config :notatwitter, :phoenix_swagger,
-  swagger_files: %{
-    "priv/static/swagger.json" => [
-      router: NotatwitterWeb.Router,
-      endpoint: NotatwitterWeb.Endpoint
-    ]
-  }
-
-config :phoenix_swagger, json_library: Jason
-
 # ## SSL Support
 #
 # In order to use HTTPS in development, a self-signed

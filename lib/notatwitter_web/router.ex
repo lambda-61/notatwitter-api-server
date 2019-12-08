@@ -42,12 +42,10 @@ defmodule NotatwitterWeb.Router do
     get "/session", SessionController, :session
   end
 
-  if Mix.env() == :dev do
-    scope "/dev" do
-      forward "/swagger", PhoenixSwagger.Plug.SwaggerUI,
-        otp_app: :notatwitter,
-        swagger_file: "swagger.json"
-    end
+  scope "/dev" do
+    forward "/swagger", PhoenixSwagger.Plug.SwaggerUI,
+      otp_app: :notatwitter,
+      swagger_file: "swagger.json"
   end
 
   def swagger_info do

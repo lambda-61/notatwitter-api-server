@@ -6,6 +6,12 @@ defmodule NotatwitterWeb.Endpoint do
     longpoll: false
 
   plug Plug.Static,
+    at: "/",
+    from: :notatwitter,
+    gzip: true,
+    only: ~w(css fonts images js favicon.ico robots.txt)
+
+  plug Plug.Static,
     at: "/uploads",
     from: Path.expand("./uploads"),
     gzip: true
