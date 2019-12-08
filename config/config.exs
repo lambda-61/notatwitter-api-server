@@ -15,7 +15,11 @@ config :notatwitter, NotatwitterWeb.Endpoint,
   url: [host: "localhost"],
   secret_key_base:
     "zV+6GICF7VWsBFYhpv4SXogjdngh0Mo9sQLnS8LB0Iu3hbxBMaUShoML/O/cxCOJ",
-  render_errors: [view: NotatwitterWeb.ErrorView, accepts: ~w(html json)],
+  render_errors: [
+    view: NotatwitterWeb.ErrorView,
+    format: "json",
+    accepts: ~w(json)
+  ],
   pubsub: [name: Notatwitter.PubSub, adapter: Phoenix.PubSub.PG2]
 
 # Configures Elixir's Logger
