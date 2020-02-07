@@ -20,7 +20,11 @@ defmodule NotatwitterWeb.Router do
       get "/posts", PostController, :index
     end
 
-    resources "/posts", PostController, only: [:create, :update]
+    resources "/posts", PostController, only: [:create, :update] do
+      resources "/replies", ReplyController, only: [:index, :create]
+    end
+
+    resources "/replies", ReplyController, only: [:update]
   end
 
   scope "/auth", NotatwitterWeb.Auth do
