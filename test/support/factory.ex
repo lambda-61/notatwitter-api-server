@@ -12,12 +12,4 @@ defmodule Notatwitter.Factory do
   def post_factory do
     %Notatwitter.User.Post{}
   end
-
-  def reply_factory do
-    %Notatwitter.User.Post.Reply{}
-  end
-
-  def following_factory do
-    %Notatwitter.User.Following{}
-  end
 end

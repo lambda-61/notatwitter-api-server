@@ -18,17 +18,9 @@ defmodule NotatwitterWeb.Router do
 
     resources "/users", UserController, only: [:index, :show, :create, :update] do
       get "/posts", PostController, :index
-      get "/follows", FollowingController, :follows
-      get "/followers", FollowingController, :followers
-      post "/follow", FollowingController, :follow
-      delete "/unfollow", FollowingController, :unfollow
     end
 
-    resources "/posts", PostController, only: [:create, :update] do
-      resources "/replies", ReplyController, only: [:index, :create]
-    end
-
-    resources "/replies", ReplyController, only: [:update]
+    resources "/posts", PostController, only: [:create, :update]
   end
 
   scope "/auth", NotatwitterWeb.Auth do

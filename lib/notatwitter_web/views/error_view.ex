@@ -24,14 +24,7 @@ defmodule NotatwitterWeb.ErrorView do
     %{errors: printable_errors}
   end
 
-  def render("500.json", %{reason: reason}) do
-    %{
-      errors: [
-        %{
-          code: "Internal Server Error",
-          details: Map.from_struct(reason)
-        }
-      ]
-    }
+  def render("500.json", _) do
+    %{errors: ["Internal Server Error"]}
   end
 end
