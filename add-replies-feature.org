@@ -1,0 +1,968 @@
+#+property: header-args:elixir :dir "."
+#+property: header-args:diff :results silent :dir "."
+#+BEGIN_SRC emacs-lisp
+(defun org-babel-execute:diff (body params)
+  (let* ((tmp (org-babel-temp-file "patch-"))
+         (cmd (concat "git apply " tmp))
+         (file-a (assoc-default :file-a params))
+         (file-b (assoc-default :file-b params)))
+    (with-temp-file tmp
+      (insert (concat
+        "--- " file-a "\n"
+        "+++ " file-b "\n"
+        body)))
+    (with-temp-buffer
+      (async-shell-command cmd (current-buffer)))))
+#+END_SRC
+#+BEGIN_SRC emacs-lisp
+(defun ob-elixir-ensure-session (session params)
+  (let ((name (format "*elixir-%s*" session)))
+    (unless (and (get-process name)
+                 (process-live-p (get-process name)))
+      (with-current-buffer (get-buffer-create name)
+        (setq-local process-environment (cons "TERM=vt100" process-environment))
+        (apply #'start-process name name "iex"
+               (append (when (assoc :script params)
+                         (list "-S" (assoc-default :script params)))
+                       (when (assoc :sname params)
+                         (list "--sname" (assoc-default :sname params)))
+                       (when (assoc :name params)
+                         (list "--name" (assoc-default :name params)))
+                       (when (assoc :cookie params)
+                         (list "--cookie" (assoc-default :cookie params)))
+                       (when (assoc :remsh params)
+                         (list "--remsh" (assoc-default :remsh params))))))
+      (set-process-filter (get-process name) 'ob-elixir-process-filter)
+      (ob-elixir-eval-in-repl session "IEx.configure(colors: [enabled: false])"))))
+#+END_SRC
+* План
+** Вступление
+*** Мотивация, зачем мы используем эликсир
+**** ФП
+**** иммутабельность
+**** работа с параллельностью
+**** большая модульность отдельных компонентов
+*** Вводная в эликсир
+**** Примеры использования синтаксиса
+*** Особенности феникса
+**** структура проекта
+**** взаимодействиес другими либами
+**** особенности кодогенерации?
+** Coding
+
+   Реализация реплаев
+
+*** Создание схем
+
+Для начала мы опишем реплаи:
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply.ex" :file-b "b/lib/notatwitter/user/post/reply.ex"
+@@ -0,0 +1,3 @@
++defmodule Notatwitter.User.Post.Reply do
++  @moduledoc false
++end
+
+#+END_SRC
+
+Для использования схемы нам нужен модуль Ecto.Schema
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply.ex" :file-b "b/lib/notatwitter/user/post/reply.ex"
+@@ -1,3 +1,6 @@
+ defmodule Notatwitter.User.Post.Reply do
+   @moduledoc false
++
++  use Ecto.Schema
++
+ end
+
+#+END_SRC
+
+Так мы указываем имя таблицы, в которой будет храниться наша схема.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply.ex" :file-b "b/lib/notatwitter/user/post/reply.ex"
+@@ -3,4 +3,6 @@ defmodule Notatwitter.User.Post.Reply do
+ 
+   use Ecto.Schema
+ 
++  schema "user_post_replies" do
++  end
+ end
+
+#+END_SRC
+
+Добавляем полей в нашей схеме.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply.ex" :file-b "b/lib/notatwitter/user/post/reply.ex"
+@@ -4,5 +4,11 @@ defmodule Notatwitter.User.Post.Reply do
+   use Ecto.Schema
+ 
+   schema "user_post_replies" do
++    belongs_to :user, User
++    belongs_to :post, Post
++
++    field :text, :string
++
++    timestamps()
+   end
+ end
+
+#+END_SRC
+
+Теперь нам нужны альясы
+
+- [ ] Записать полное имя в belongs_to без альясов сначала
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply.ex" :file-b "b/lib/notatwitter/user/post/reply.ex"
+@@ -3,6 +3,9 @@ defmodule Notatwitter.User.Post.Reply do
+ 
+   use Ecto.Schema
+ 
++  alias Notatwitter.User
++  alias Notatwitter.User.Post
++
+   schema "user_post_replies" do
+     belongs_to :user, User
+     belongs_to :post, Post
+
+#+END_SRC
+
+Мы можем посмотреть, что получилось в схеме теперь:
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+alias Notatwitter.User.Post.Reply
+%Reply{}
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+%Notatwitter.User.Post.Reply{
+  __meta__: #Ecto.Schema.Metadata<:built, "user_post_replies">,
+  id: nil,
+  inserted_at: nil,
+  post: #Ecto.Association.NotLoaded<association :post is not loaded>,
+  post_id: nil,
+  text: nil,
+  updated_at: nil,
+  user: #Ecto.Association.NotLoaded<association :user is not loaded>,
+  user_id: nil
+}
+#+end_example
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+Reply.__info__(:functions)
+#+END_SRC
+
+#+RESULTS:
+: [__changeset__: 0, __schema__: 1, __schema__: 2, __struct__: 0, __struct__: 1]
+
+На этом описание схемы завершено и мы переходим к операциям над ней.
+
+*** Работа со схемами
+
+Создаём модуль.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply/manager.ex" :file-b "b/lib/notatwitter/user/post/reply/manager.ex"
+@@ -0,0 +1,3 @@
++defmodule Notatwitter.User.Post.Reply.Manager do
++  @moduledoc false
++end
+
+#+END_SRC
+
+Определим, какие методы над реплаем у нас будут.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply/manager.ex" :file-b "b/lib/notatwitter/user/post/reply/manager.ex"
+@@ -1,3 +1,12 @@
+ defmodule Notatwitter.User.Post.Reply.Manager do
+   @moduledoc false
++
++  def list(post_id) do
++  end
++
++  def create(user_id, post_id, attrs) do
++  end
++
++  def update(reply, attrs) do
++  end
+ end
+
+#+END_SRC
+
+Здесь нам поможет один важный инстумент из Elixir, который есть во
+многих функциональных языках программирования, -- пайпы.
+
+#+BEGIN_SRC elixir
+1 |> Kernel.+(2) |> to_string
+#+END_SRC
+
+#+RESULTS:
+: "3"
+
+Сделаем список -- здесь нам понадобится Ecto.Query
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply/manager.ex" :file-b "b/lib/notatwitter/user/post/reply/manager.ex"
+@@ -1,7 +1,16 @@
+ defmodule Notatwitter.User.Post.Reply.Manager do
+   @moduledoc false
+ 
++  import Ecto.Query
++
++  alias Notatwitter.Repo
++  alias Notatwitter.User.Post.Reply
++
+   def list(post_id) do
++    Reply
++    |> where([r], r.post_id == ^post_id)
++    |> preload([:user])
++    |> Repo.all()
+   end
+ 
+   def create(user_id, post_id, attrs) do
+
+#+END_SRC
+
+Добавим создание и обновление
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply/manager.ex" :file-b "b/lib/notatwitter/user/post/reply/manager.ex"
+@@ -3,6 +3,7 @@ defmodule Notatwitter.User.Post.Reply.Manager do
+ 
+   import Ecto.Query
+ 
++  alias Ecto.Changeset
+   alias Notatwitter.Repo
+   alias Notatwitter.User.Post.Reply
+ 
+@@ -14,8 +15,22 @@ defmodule Notatwitter.User.Post.Reply.Manager do
+   end
+ 
+   def create(user_id, post_id, attrs) do
++    attrs = Map.merge(attrs, %{"user_id" => user_id, "post_id" => post_id})
++
++    %Reply{}
++    |> Changeset.cast(attrs, [:text, :user_id, :post_id])
++    |> Changeset.foreign_key_constraint(:user_id)
++    |> Changeset.foreign_key_constraint(:post_id)
++    |> Changeset.validate_required([:text, :user_id, :post_id])
++    |> Changeset.validate_length(:text, max: 140, count: :bytes)
++    |> Repo.insert()
+   end
+ 
+   def update(reply, attrs) do
++    reply
++    |> Changeset.cast(attrs, [:text])
++    |> Changeset.validate_length(:text, max: 140, count: :bytes)
++    |> Changeset.validate_required([:text, :user_id, :post_id])
++    |> Repo.update()
+   end
+ end
+
+#+END_SRC
+
+Теперь можно проверить работу нашего модуля
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+alias Notatwitter.Users
+user = Users.list_users() |> hd
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[36m[debug] QUERY OK source="users" db=2.9ms queue=0.1ms
+SELECT u0."id", u0."username", u0."avatar", u0."inserted_at", u0."updated_at" FROM "users" AS u0 []
+[0m %Notatwitter.User{
+  __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+  avatar: nil,
+  followers: #Ecto.Association.NotLoaded<association :followers is not loaded>,
+  follows: #Ecto.Association.NotLoaded<association :follows is not loaded>,
+  id: 1,
+  inserted_at: ~N[2019-11-10 14:53:17],
+  posts: #Ecto.Association.NotLoaded<association :posts is not loaded>,
+  updated_at: ~N[2019-11-10 14:53:17],
+  username: "test"
+}
+#+end_example
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+{:ok, post} = Users.create_post(user.id, %{"text" => "post text"})
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[32m[debug] QUERY OK db=12.2ms queue=2.7ms
+INSERT INTO "user_posts" ("text","user_id","inserted_at","updated_at") VALUES ($1,$2,$3,$4) RETURNING "id" ["post text", 1, ~N[2020-02-24 16:30:54], ~N[2020-02-24 16:30:54]]
+[0m [36m[debug] QUERY OK source="users" db=4.5ms queue=0.1ms
+SELECT u0."id", u0."username", u0."avatar", u0."inserted_at", u0."updated_at", u0."id" FROM "users" AS u0 WHERE (u0."id" = $1) [1]
+[0m {:ok,
+ %Notatwitter.User.Post{
+   __meta__: #Ecto.Schema.Metadata<:loaded, "user_posts">,
+   id: 5,
+   inserted_at: ~N[2020-02-24 16:30:54],
+   text: "post text",
+   updated_at: ~N[2020-02-24 16:30:54],
+   user: %Notatwitter.User{
+     __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+     avatar: nil,
+     followers: #Ecto.Association.NotLoaded<association :followers is not loaded>,
+     follows: #Ecto.Association.NotLoaded<association :follows is not loaded>,
+     id: 1,
+     inserted_at: ~N[2019-11-10 14:53:17],
+     posts: #Ecto.Association.NotLoaded<association :posts is not loaded>,
+     updated_at: ~N[2019-11-10 14:53:17],
+     username: "test"
+   },
+   user_id: 1
+ }}
+#+end_example
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+alias Notatwitter.User.Post.Reply.Manager
+{:ok, reply} = Manager.create(user.id, post.id, %{"text" => "reply text"})
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[32m[debug] QUERY OK db=64.4ms queue=2.1ms
+INSERT INTO "user_post_replies" ("post_id","text","user_id","inserted_at","updated_at") VALUES ($1,$2,$3,$4,$5) RETURNING "id" [5, "reply text", 1, ~N[2020-02-24 16:32:03], ~N[2020-02-24 16:32:03]] 
+[0m [36m[debug] QUERY OK source="users" db=3.0ms queue=0.1ms
+SELECT u0."id", u0."username", u0."avatar", u0."inserted_at", u0."updated_at", u0."id" FROM "users" AS u0 WHERE (u0."id" = $1) [1]
+[0m {:ok,
+ %Notatwitter.User.Post.Reply{
+   __meta__: #Ecto.Schema.Metadata<:loaded, "user_post_replies">,
+   id: 6,
+   inserted_at: ~N[2020-02-24 16:32:03],
+   post: #Ecto.Association.NotLoaded<association :post is not loaded>,
+   post_id: 5,
+   text: "reply text",
+   updated_at: ~N[2020-02-24 16:32:03],
+   user: %Notatwitter.User{
+     __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+     avatar: nil,
+     followers: #Ecto.Association.NotLoaded<association :followers is not loaded>,
+     follows: #Ecto.Association.NotLoaded<association :follows is not loaded>,
+     id: 1,
+     inserted_at: ~N[2019-11-10 14:53:17],
+     posts: #Ecto.Association.NotLoaded<association :posts is not loaded>,
+     updated_at: ~N[2019-11-10 14:53:17],
+     username: "test"
+   },
+   user_id: 1
+ }}
+#+end_example
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+{:ok, updated_reply} = Manager.update(reply, %{"text" => "new reply text"})
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[33m[debug] QUERY OK db=38.0ms queue=2.5ms
+UPDATE "user_post_replies" SET "text" = $1, "updated_at" = $2 WHERE "id" = $3 ["new reply text", ~N[2020-02-24 16:32:50], 6]
+[0m {:ok,
+ %Notatwitter.User.Post.Reply{
+   __meta__: #Ecto.Schema.Metadata<:loaded, "user_post_replies">,
+   id: 6,
+   inserted_at: ~N[2020-02-24 16:32:03],
+   post: #Ecto.Association.NotLoaded<association :post is not loaded>,
+   post_id: 5,
+   text: "new reply text",
+   updated_at: ~N[2020-02-24 16:32:50],
+   user: %Notatwitter.User{
+     __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+     avatar: nil,
+     followers: #Ecto.Association.NotLoaded<association :followers is not loaded>,
+     follows: #Ecto.Association.NotLoaded<association :follows is not loaded>,
+     id: 1,
+     inserted_at: ~N[2019-11-10 14:53:17],
+     posts: #Ecto.Association.NotLoaded<association :posts is not loaded>,
+     updated_at: ~N[2019-11-10 14:53:17],
+     username: "test"
+   },
+   user_id: 1
+ }}
+#+end_example
+
+#+BEGIN_SRC elixir :script mix :session new-session-1
+Manager.list(post.id)
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+[36m[debug] QUERY OK source="user_post_replies" db=1.1ms queue=1.3ms
+SELECT u0."id", u0."user_id", u0."post_id", u0."text", u0."inserted_at", u0."updated_at" FROM "user_post_replies" AS u0 WHERE (u0."post_id" = $1) [5]
+[0m [36m[debug] QUERY OK source="users" db=0.7ms queue=0.1ms
+SELECT u0."id", u0."username", u0."avatar", u0."inserted_at", u0."updated_at", u0."id" FROM "users" AS u0 WHERE (u0."id" = $1) [1]
+[0m [
+  %Notatwitter.User.Post.Reply{
+    __meta__: #Ecto.Schema.Metadata<:loaded, "user_post_replies">,
+    id: 6,
+    inserted_at: ~N[2020-02-24 16:32:03],
+    post: #Ecto.Association.NotLoaded<association :post is not loaded>,
+    post_id: 5,
+    text: "new reply text",
+    updated_at: ~N[2020-02-24 16:32:50],
+    user: %Notatwitter.User{
+      __meta__: #Ecto.Schema.Metadata<:loaded, "users">,
+      avatar: nil,
+      followers: #Ecto.Association.NotLoaded<association :followers is not loaded>,
+      follows: #Ecto.Association.NotLoaded<association :follows is not loaded>,
+      id: 1,
+      inserted_at: ~N[2019-11-10 14:53:17],
+      posts: #Ecto.Association.NotLoaded<association :posts is not loaded>,
+      updated_at: ~N[2019-11-10 14:53:17],
+      username: "test"
+    },
+    user_id: 1
+  }
+]
+#+end_example
+
+*** Контексты
+
+Предоставим интерфейс для наших операций.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/users.ex" :file-b "b/lib/notatwitter/users.ex"
+@@ -3,6 +3,7 @@ defmodule Notatwitter.Users do
+ 
+   alias Notatwitter.{Auth, User}
+   alias Notatwitter.User.Post
++  alias Notatwitter.User.Post.Reply
+ 
+   defdelegate list_users(), to: User.Manager, as: :list
+   defdelegate find_user(id), to: User.Manager, as: :find
+@@ -13,4 +14,13 @@ defmodule Notatwitter.Users do
+   defdelegate find_post(post_id), to: Post.Manager, as: :find
+   defdelegate create_post(user_id, attrs), to: Post.Manager, as: :create
+   defdelegate update_post(post_id, attrs), to: Post.Manager, as: :update
++
++  defdelegate list_replies(post_id), to: Reply.Manager, as: :list
++  defdelegate find_reply(reply_id), to: Reply.Manager, as: :find
++
++  defdelegate create_reply(user_id, post_id, attrs),
++    to: Reply.Manager,
++    as: :create
++
++  defdelegate update_reply(reply_id, attrs), to: Reply.Manager, as: :update
+ end
+
+#+END_SRC
+
+*** Роутер
+
+Для начала добавим ресурсы в роутер. Они указывают, какие модули
+должны выполнять операции в зависимости от пути и метода.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/router.ex" :file-b "b/lib/notatwitter_web/router.ex"
+@@ -20,7 +20,11 @@ defmodule NotatwitterWeb.Router do
+       get "/posts", PostController, :index
+     end
+ 
+-    resources "/posts", PostController, only: [:create, :update]
++    resources "/posts", PostController, only: [:create, :update] do
++      resources "/replies", ReplyController, only: [:index, :create]
++    end
++
++    resources "/replies", ReplyController, only: [:update]
+   end
+ 
+   scope "/auth", NotatwitterWeb.Auth do
+
+#+END_SRC
+
+*** Контроллер
+
+Создадим файл контроллера. Его имя должно оканчиваться на Controller.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -0,0 +1,3 @@
++defmodule NotatwitterWeb.ReplyController do
++  @moduledoc false
++end
+
+#+END_SRC
+
+Определим действия. Это функции, принимающие два аргумента -- `conn`
+предоставляет информацию о подключении, а второй аргументы, который
+нам пока не важен -- всевозможные параметры из запроса (json body,
+form-data, query и вот это всё).
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -1,3 +1,14 @@
+ defmodule NotatwitterWeb.ReplyController do
+   @moduledoc false
++
++  use NotatwitterWeb, :controller
++
++  def index(conn, _) do
++  end
++
++  def create(conn, _) do
++  end
++
++  def update(conn, _) do
++  end
+ end
+
+#+END_SRC
+
+Ресурсы предоставляют нам параметры, которые тоже помещаются во второй
+аргумент. Мы извлечём их прямо оттуда.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -3,12 +3,12 @@ defmodule NotatwitterWeb.ReplyController do
+ 
+   use NotatwitterWeb, :controller
+ 
+-  def index(conn, _) do
++  def index(conn, %{"post_id" => post_id}) do
+   end
+ 
+-  def create(conn, _) do
++  def create(conn, %{"post_id" => post_id} = params) do
+   end
+ 
+-  def update(conn, _) do
++  def update(conn, %{"id" => id} = params) do
+   end
+ end
+
+#+END_SRC
+
+В контроллере мы будем вызывать нашу бизнес-логику, и, как можно было
+заметить, создание требует не только id поста, к которому привязан
+реплай, но и id пользователя, его сделавшего. Для его получения мы
+используем функцию из библиотеки Guardian, которая отвечает за
+авторизацию.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -7,6 +7,7 @@ defmodule NotatwitterWeb.ReplyController do
+   end
+ 
+   def create(conn, %{"post_id" => post_id} = params) do
++    %{id: user_id} = Guardian.Plug.current_resource(conn)
+   end
+ 
+   def update(conn, %{"id" => id} = params) do
+
+#+END_SRC
+
+Теперь, когда все необходимые параметры у нас есть, мы можем
+переходить к вызову функций из контекста. Здесь мы просто передаём
+возвращённые данные в соответствующие вьюшки.
+
+- [ ] Небольшой интродакшон в with
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -3,13 +3,27 @@ defmodule NotatwitterWeb.ReplyController do
+ 
+   use NotatwitterWeb, :controller
+ 
++  alias Notatwitter.Users
++
+   def index(conn, %{"post_id" => post_id}) do
++    replies = Users.list_replies(post_id)
++    render(conn, "index.json", replies: replies)
+   end
+ 
+   def create(conn, %{"post_id" => post_id} = params) do
+     %{id: user_id} = Guardian.Plug.current_resource(conn)
++
++    with {:ok, reply} <- Users.create_reply(user_id, post_id, params) do
++      conn
++      |> put_status(:created)
++      |> render("created.json", reply: reply)
++    end
+   end
+ 
+   def update(conn, %{"id" => id} = params) do
++    with {:ok, reply} <- Users.find_reply(id),
++         {:ok, reply} <- Users.update_reply(reply, params) do
++      render(conn, "updated.json", reply: reply)
++    end
+   end
+ end
+
+#+END_SRC
+
+Как мы можем увидеть, мы никак не контролируем права на редактирование
+-- а ведь это действие, которое может совершить только автор
+реплая. Чтобы это исправить, мы будем использовать библиотеку
+Bodyguard. Нам надо передать модуль, где определены права, название
+действия, текущего пользователя и сам объект, над которым совершается
+действие.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -3,6 +3,7 @@ defmodule NotatwitterWeb.ReplyController do
+ 
+   use NotatwitterWeb, :controller
+ 
++  alias Notatwitter.User.AccessPolicy
+   alias Notatwitter.Users
+ 
+   def index(conn, %{"post_id" => post_id}) do
+@@ -21,7 +22,11 @@ defmodule NotatwitterWeb.ReplyController do
+   end
+ 
+   def update(conn, %{"id" => id} = params) do
++    current_user = Guardian.Plug.current_resource(conn)
++
+     with {:ok, reply} <- Users.find_reply(id),
++         :ok <-
++           Bodyguard.permit(AccessPolicy, :update_reply, current_user, reply),
+          {:ok, reply} <- Users.update_reply(reply, params) do
+       render(conn, "updated.json", reply: reply)
+     end
+
+#+END_SRC
+
+Теперь надо перейти к определению модуля с правами и добавить правила
+для нашего действия.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/access_policy.ex" :file-b "b/lib/notatwitter/user/access_policy.ex"
+@@ -18,6 +18,11 @@ defmodule Notatwitter.User.AccessPolicy do
+     :ok
+   end
+ 
++  @impl true
++  def authorize(:update_reply, %{id: id}, %{user_id: id}) do
++    :ok
++  end
++
+   @impl true
+   def authorize(_, _, _) do
+     :error
+
+#+END_SRC
+
+Все действия в контроллере должны возвращать структуру %Plug.Conn{},
+но некоторые действия сейчас возвращают error-тупл на ошибке. Это
+сделано специально, чтобы не писать вложенные кейсы и не переписывать
+сотни раз обработку ошибок. Мы можем подключить fallback controller,
+который будет обрабатывать возвращённые не-conn значения.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/controllers/reply_controller.ex" :file-b "b/lib/notatwitter_web/controllers/reply_controller.ex"
+@@ -6,6 +6,8 @@ defmodule NotatwitterWeb.ReplyController do
+   alias Notatwitter.User.AccessPolicy
+   alias Notatwitter.Users
+ 
++  action_fallback NotatwitterWeb.ErrorController
++
+   def index(conn, %{"post_id" => post_id}) do
+     replies = Users.list_replies(post_id)
+     render(conn, "index.json", replies: replies)
+
+#+END_SRC
+
+На этом с контроллерами всё, и мы переходим ко вью.
+
+*** Вью
+
+Как и во всех предыдущих случаях, мы создаём модуль.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/views/reply_view.ex" :file-b "b/lib/notatwitter_web/views/reply_view.ex"
+@@ -0,0 +1,3 @@
++defmodule NotatwitterWeb.ReplyView do
++  @moduledoc false
++end
+
+#+END_SRC
+
+Действия во вью определяются паттерн-матчингом на первом параметре
+функции `render/2`. Мы определим функции для наших действий, а так же
+общий `render/2`, который будет непосредственно отрисовывать реплай.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/views/reply_view.ex" :file-b "b/lib/notatwitter_web/views/reply_view.ex"
+@@ -1,3 +1,17 @@
+ defmodule NotatwitterWeb.ReplyView do
+   @moduledoc false
++
++  use NotatwitterWeb, :view
++
++  def render("index.json", %{replies: replies}) do
++  end
++
++  def render("created.json", %{reply: reply}) do
++  end
++
++  def render("updated.json", %{reply: reply}) do
++  end
++
++  def render("reply.json", %{reply: %{user: user} = reply}) do
++  end
+ end
+
+#+END_SRC
+
+Сначала сделаем общую вьюху. В ней мы будем возвращать мапу с полями
+-- она автоматически сконвертится в json нашим фреймворком.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/views/reply_view.ex" :file-b "b/lib/notatwitter_web/views/reply_view.ex"
+@@ -13,5 +13,13 @@ defmodule NotatwitterWeb.ReplyView do
+   end
+ 
+   def render("reply.json", %{reply: %{user: user} = reply}) do
++    %{
++      id: reply.id,
++      user_id: user.id,
++      username: user.username,
++      avatar: image_url({user.avatar, user}, :big),
++      created_at: datetime_to_integer(reply.inserted_at),
++      text: reply.text
++    }
+   end
+ end
+
+#+END_SRC
+
+Теперь нам надо только вызвать эту вьюху в отдельных вьюхах на каждое
+действие.
+
+Для "created.json" и "updated.json" мы будем вызывать её через
+`render_one/4` -- он просто находит указанную вьюху и передаёт туда
+первый аргумент.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/views/reply_view.ex" :file-b "b/lib/notatwitter_web/views/reply_view.ex"
+@@ -7,9 +7,11 @@ defmodule NotatwitterWeb.ReplyView do
+   end
+ 
+   def render("created.json", %{reply: reply}) do
++    render_one(reply, __MODULE__, "reply.json")
+   end
+ 
+   def render("updated.json", %{reply: reply}) do
++    render_one(reply, __MODULE__, "reply.json")
+   end
+ 
+   def render("reply.json", %{reply: %{user: user} = reply}) do
+
+#+END_SRC
+
+В случае с "index.json" мы имеем дело не с одним реплаем, а со
+списком. С ними нам поможет `render_many/4`.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter_web/views/reply_view.ex" :file-b "b/lib/notatwitter_web/views/reply_view.ex"
+@@ -4,6 +4,7 @@ defmodule NotatwitterWeb.ReplyView do
+   use NotatwitterWeb, :view
+ 
+   def render("index.json", %{replies: replies}) do
++    render_many(replies, __MODULE__, "reply.json")
+   end
+ 
+   def render("created.json", %{reply: reply}) do
+
+#+END_SRC
+
+На этом со вьюхами закончили.
+
+*** Запускаем
+
+#+BEGIN_SRC sh :dir "." :results output :exports both :eval yes
+mix phx.server
+#+END_SRC
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/auth/register
+Accept: application/json
+Content-Type: application/json
+
+{"username":"username","password":"password"}
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC js
+{
+  "id": 6,
+  "username": "username"
+}
+// POST http://localhost:4000/auth/register
+// HTTP/1.1 201 Created
+// cache-control: max-age=0, private, must-revalidate
+// content-length: 30
+// content-type: application/json; charset=utf-8
+// cross-origin-window-policy: deny
+// date: Mon, 24 Feb 2020 16:11:15 GMT
+// server: Cowboy
+// x-content-type-options: nosniff
+// x-download-options: noopen
+// x-frame-options: SAMEORIGIN
+// x-permitted-cross-domain-policies: none
+// x-request-id: FfZijCQGM5eG9rgAAAEE
+// x-xss-protection: 1; mode=block
+// Request duration: 2.221744s
+#+END_SRC
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{"username":"username","password":"password"}
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC js
+{
+  "id": 6,
+  "token": "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJub3RhdHdpdHRlciIsImV4cCI6MTU4NDk3OTk1NywiaWF0IjoxNTgyNTYwNzU3LCJpc3MiOiJub3RhdHdpdHRlciIsImp0aSI6IjAwMjBkZjdhLTI4MzgtNDlkYy05OTQzLWY5OGY0NWE4ZmVlNCIsIm5iZiI6MTU4MjU2MDc1Niwic3ViIjoiNiIsInR5cCI6ImFjY2VzcyJ9.hKEShyjLV2VVMdxE-hLZ3B61GnkqNtzjyjDFtb-0VkIP8xcG2u-rOtKRnvyCSRdHrzIzlf5aBQUQpDFnBMfehw",
+  "username": "username"
+}
+// POST http://localhost:4000/auth/login
+// HTTP/1.1 200 OK
+// cache-control: max-age=0, private, must-revalidate
+// content-length: 381
+// content-type: application/json; charset=utf-8
+// cross-origin-window-policy: deny
+// date: Mon, 24 Feb 2020 16:12:37 GMT
+// server: Cowboy
+// x-content-type-options: nosniff
+// x-download-options: noopen
+// x-frame-options: SAMEORIGIN
+// x-permitted-cross-domain-policies: none
+// x-request-id: FfZin3qbOBUYl5YAAAEk
+// x-xss-protection: 1; mode=block
+// set-cookie: sessionToken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJub3RhdHdpdHRlciIsImV4cCI6MTU4NDk3OTk1NywiaWF0IjoxNTgyNTYwNzU3LCJpc3MiOiJub3RhdHdpdHRlciIsImp0aSI6IjAwMjBkZjdhLTI4MzgtNDlkYy05OTQzLWY5OGY0NWE4ZmVlNCIsIm5iZiI6MTU4MjU2MDc1Niwic3ViIjoiNiIsInR5cCI6ImFjY2VzcyJ9.hKEShyjLV2VVMdxE-hLZ3B61GnkqNtzjyjDFtb-0VkIP8xcG2u-rOtKRnvyCSRdHrzIzlf5aBQUQpDFnBMfehw; Path=/; Max-Age=86400
+// Request duration: 1.846802s
+#+END_SRC
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/posts
+Accept: application/json
+Content-Type: application/json
+
+{"text":"new post!"}
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC js
+{
+  "avatar": null,
+  "createdAt": 1582560864,
+  "id": 3,
+  "text": "new post!",
+  "userId": 6,
+  "username": "username"
+}
+// POST http://localhost:4000/posts
+// HTTP/1.1 201 Created
+// cache-control: max-age=0, private, must-revalidate
+// content-length: 97
+// content-type: application/json; charset=utf-8
+// cross-origin-window-policy: deny
+// date: Mon, 24 Feb 2020 16:14:24 GMT
+// server: Cowboy
+// x-content-type-options: nosniff
+// x-download-options: noopen
+// x-frame-options: SAMEORIGIN
+// x-permitted-cross-domain-policies: none
+// x-request-id: FfZiuJ0CMGRgKm4AAAGE
+// x-xss-protection: 1; mode=block
+// set-cookie: sessionToken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJub3RhdHdpdHRlciIsImV4cCI6MTU4NDk3OTk1NywiaWF0IjoxNTgyNTYwNzU3LCJpc3MiOiJub3RhdHdpdHRlciIsImp0aSI6IjAwMjBkZjdhLTI4MzgtNDlkYy05OTQzLWY5OGY0NWE4ZmVlNCIsIm5iZiI6MTU4MjU2MDc1Niwic3ViIjoiNiIsInR5cCI6ImFjY2VzcyJ9.hKEShyjLV2VVMdxE-hLZ3B61GnkqNtzjyjDFtb-0VkIP8xcG2u-rOtKRnvyCSRdHrzIzlf5aBQUQpDFnBMfehw; Path=/; Max-Age=86400
+// Request duration: 0.319683s
+#+END_SRC
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/posts/3/replies
+Accept: application/json
+Content-Type: application/json
+
+{"text":"reply!"}
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC js
+{
+  "avatar": null,
+  "createdAt": 1582560956,
+  "id": 5,
+  "text": "reply!",
+  "userId": 6,
+  "username": "username"
+}
+// POST http://localhost:4000/posts/3/replies
+// HTTP/1.1 201 Created
+// cache-control: max-age=0, private, must-revalidate
+// content-length: 94
+// content-type: application/json; charset=utf-8
+// cross-origin-window-policy: deny
+// date: Mon, 24 Feb 2020 16:15:56 GMT
+// server: Cowboy
+// x-content-type-options: nosniff
+// x-download-options: noopen
+// x-frame-options: SAMEORIGIN
+// x-permitted-cross-domain-policies: none
+// x-request-id: FfZizifZc9S8BfwAAAHk
+// x-xss-protection: 1; mode=block
+// set-cookie: sessionToken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJub3RhdHdpdHRlciIsImV4cCI6MTU4NDk3OTk1NywiaWF0IjoxNTgyNTYwNzU3LCJpc3MiOiJub3RhdHdpdHRlciIsImp0aSI6IjAwMjBkZjdhLTI4MzgtNDlkYy05OTQzLWY5OGY0NWE4ZmVlNCIsIm5iZiI6MTU4MjU2MDc1Niwic3ViIjoiNiIsInR5cCI6ImFjY2VzcyJ9.hKEShyjLV2VVMdxE-hLZ3B61GnkqNtzjyjDFtb-0VkIP8xcG2u-rOtKRnvyCSRdHrzIzlf5aBQUQpDFnBMfehw; Path=/; Max-Age=86400
+// Request duration: 0.169850s
+#+END_SRC
+
+#+BEGIN_SRC restclient
+GET http://localhost:4000/posts/3/replies
+Accept: application/json
+Content-Type: application/json
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC js
+[
+  {
+    "avatar": null,
+    "createdAt": 1582560956,
+    "id": 5,
+    "text": "reply!",
+    "userId": 6,
+    "username": "username"
+  }
+]
+// GET http://localhost:4000/posts/3/replies
+// HTTP/1.1 200 OK
+// cache-control: max-age=0, private, must-revalidate
+// content-length: 96
+// content-type: application/json; charset=utf-8
+// cross-origin-window-policy: deny
+// date: Mon, 24 Feb 2020 16:17:01 GMT
+// server: Cowboy
+// x-content-type-options: nosniff
+// x-download-options: noopen
+// x-frame-options: SAMEORIGIN
+// x-permitted-cross-domain-policies: none
+// x-request-id: FfZi3Wk3yE2b6sgAAAMB
+// x-xss-protection: 1; mode=block
+// set-cookie: sessionToken=eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJub3RhdHdpdHRlciIsImV4cCI6MTU4NDk3OTk1NywiaWF0IjoxNTgyNTYwNzU3LCJpc3MiOiJub3RhdHdpdHRlciIsImp0aSI6IjAwMjBkZjdhLTI4MzgtNDlkYy05OTQzLWY5OGY0NWE4ZmVlNCIsIm5iZiI6MTU4MjU2MDc1Niwic3ViIjoiNiIsInR5cCI6ImFjY2VzcyJ9.hKEShyjLV2VVMdxE-hLZ3B61GnkqNtzjyjDFtb-0VkIP8xcG2u-rOtKRnvyCSRdHrzIzlf5aBQUQpDFnBMfehw; Path=/; Max-Age=86400
+// Request duration: 0.153013s
+#+END_SRC
+
+Добавим прилоады.
+
+#+BEGIN_SRC diff :file-a "a/lib/notatwitter/user/post/reply/manager.ex" :file-b "b/lib/notatwitter/user/post/reply/manager.ex"
+@@ -15,6 +15,12 @@ defmodule Notatwitter.User.Post.Reply.Manager do
+   end
+ 
+   def create(user_id, post_id, attrs) do
++    with {:ok, reply} <- do_create(user_id, post_id, attrs) do
++      {:ok, Repo.preload(reply, [:user])}
++    end
++  end
++
++  defp do_create(user_id, post_id, attrs) do
+     attrs = Map.merge(attrs, %{"user_id" => user_id, "post_id" => post_id})
+ 
+     %Reply{}
+@@ -26,7 +32,13 @@ defmodule Notatwitter.User.Post.Reply.Manager do
+     |> Repo.insert()
+   end
+ 
+-  def update(reply, attrs) do
++  def update(%Reply{} = reply, attrs) do
++    with {:ok, reply} <- do_update(reply, attrs) do
++      {:ok, Repo.preload(reply, [:user])}
++    end
++  end
++
++  defp do_update(reply, attrs) do
+     reply
+     |> Changeset.cast(attrs, [:text])
+     |> Changeset.validate_length(:text, max: 140, count: :bytes)
+
+#+END_SRC
+
+Теперь всё должно работать.
