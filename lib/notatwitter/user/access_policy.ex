@@ -19,11 +19,6 @@ defmodule Notatwitter.User.AccessPolicy do
   end
 
   @impl true
-  def authorize(:update_reply, %{id: id}, %{user_id: id}) do
-    :ok
-  end
-
-  @impl true
   def authorize(_, _, _) do
     :error
   end
