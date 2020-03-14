@@ -1,0 +1,47 @@
+* регистрация
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/auth/register
+Accept: application/json
+Content-Type: application/json
+
+{"username":"username","password":"password"}
+#+END_SRC
+
+* логин
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/auth/login
+Accept: application/json
+Content-Type: application/json
+
+{"username":"username","password":"password"}
+#+END_SRC
+
+* создание поста
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/posts
+Accept: application/json
+Content-Type: application/json
+
+{"text":"new post!"}
+#+END_SRC
+
+* создание реплая для поста
+
+#+BEGIN_SRC restclient
+POST http://localhost:4000/posts/3/replies
+Accept: application/json
+Content-Type: application/json
+
+{"text":"reply!"}
+#+END_SRC
+
+* получение списка реплаев для поста
+
+#+BEGIN_SRC restclient
+GET http://localhost:4000/posts/3/replies
+Accept: application/json
+Content-Type: application/json
+#+END_SRC
